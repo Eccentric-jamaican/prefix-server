@@ -1,0 +1,13 @@
+Subject: Welcome to Prefix
+From: hello@example.com
+To: user@example.com
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html>
+<html>
+  <body>
+    <p>Hello {{ first_name }},</p>
+    <p>We noticed your account {{ account_id }} is almost ready.</p>
+    <p>Confirm here: https://example.com/{{ confirmation_code }}</p>
+  </body>
+</html>

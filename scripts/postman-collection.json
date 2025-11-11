@@ -1,0 +1,89 @@
+{
+  "info": {
+    "name": "Prefix API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Scan",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/scan",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "scan"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Hello {First_name}\",\n  \"html\": \"<p>Hi {{ first_name }}</p>\",\n  \"text\": \"Hi *|FNAME|*\",\n  \"fail_on\": \"medium\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Scan URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/scan/url",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "scan", "url"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://example.com/template.html\",\n  \"fail_on\": \"medium\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Scan RFC822",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/scan/rfc822",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "scan", "rfc822"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"raw\": \"Subject: Greetings\\nContent-Type: text/html\\n\\n<p>{{ name }}</p>\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Schema Check",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/scan/schema",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "scan", "schema"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"html\": \"<p>{{ first_name }}</p>\",\n  \"variables\": [\"first_name\", \"last_name\"]\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "api_key", "value": "change-me" }
+  ]
+}

@@ -1,0 +1,352 @@
+openapi: 3.1.0
+info:
+  title: Prefix API
+  version: 1.0.0
+  description: |
+    Prefix scans email content for unresolved personalization tokens and blocks sends when policy thresholds are breached.
+servers:
+  - url: https://api.prefix.example.com
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SeveritySummary:
+      type: object
+      properties:
+        high:
+          type: integer
+          minimum: 0
+        medium:
+          type: integer
+          minimum: 0
+        low:
+          type: integer
+          minimum: 0
+      required: [high, medium, low]
+    Finding:
+      type: object
+      properties:
+        token:
+          type: string
+        family:
+          type: string
+        severity:
+          type: string
+          enum: [high, medium, low]
+        location:
+          type: string
+          enum: [subject, html, text]
+        line:
+          type: integer
+          minimum: 1
+        snippet:
+          type: string
+      required: [token, family, severity, location, line, snippet]
+    ScanResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        severity_summary:
+          $ref: '#/components/schemas/SeveritySummary'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+        advice:
+          type: array
+          items:
+            type: string
+        worst_severity:
+          type: string
+          nullable: true
+          enum: [high, medium, low, null]
+        fail_on:
+          type: string
+          enum: [none, low, medium, high]
+      required: [ok, severity_summary, findings, advice, worst_severity, fail_on]
+    SchemaCheckResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        missingVariables:
+          type: array
+          items:
+            type: string
+        unusedVariables:
+          type: array
+          items:
+            type: string
+        tokenIdentifiers:
+          type: array
+          items:
+            type: string
+        unknownTokens:
+          type: array
+          items:
+            type: string
+      required: [ok, missingVariables, unusedVariables, tokenIdentifiers, unknownTokens]
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+          nullable: true
+      required: [ok, error]
+  parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Cache key that ensures duplicate requests receive the same response for 10 minutes.
+paths:
+  /v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                example:
+                  ok: true
+  /v1/scan:
+    post:
+      summary: Scan inline payload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject:
+                  type: string
+                html:
+                  type: string
+                text:
+                  type: string
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                fail_on:
+                  type: string
+                  enum: [none, low, medium, high]
+                  default: medium
+                context_hint:
+                  type: string
+              minProperties: 1
+      responses:
+        '200':
+          description: Scan successful (no blocking findings)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '409':
+          description: Policy violated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+  /v1/scan/url:
+    post:
+      summary: Fetch external template and scan
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                fail_on:
+                  type: string
+                  enum: [none, low, medium, high]
+                  default: medium
+                context_hint:
+                  type: string
+      responses:
+        '200':
+          description: Scan complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '409':
+          description: Policy violated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '502':
+          description: Upstream fetch failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/scan/rfc822:
+    post:
+      summary: Scan RFC822 message
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [raw]
+              properties:
+                raw:
+                  type: string
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                fail_on:
+                  type: string
+                  enum: [none, low, medium, high]
+                  default: medium
+                context_hint:
+                  type: string
+          message/rfc822:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Scan complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '409':
+          description: Policy violated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+  /v1/scan/schema:
+    post:
+      summary: Cross-check template variables
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variables]
+              properties:
+                subject:
+                  type: string
+                html:
+                  type: string
+                text:
+                  type: string
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                variables:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Schema comparison results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaCheckResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+  /v1/metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics output
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Metrics disabled
+security:
+  - bearerAuth: []

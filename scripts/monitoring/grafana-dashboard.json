@@ -1,0 +1,40 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Request Rate",
+      "targets": [
+        {
+          "expr": "sum(rate(prefix_http_requests_total[5m]))",
+          "legendFormat": "requests/s"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Latency (p95)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(prefix_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Policy Blocks",
+      "targets": [
+        {
+          "expr": "sum(rate(prefix_http_requests_total{status=\"409\"}[5m]))",
+          "legendFormat": "409 blocks/s"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 30,
+  "title": "Prefix Overview",
+  "version": 1
+}
