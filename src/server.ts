@@ -28,6 +28,7 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "*";
 const app = express();
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
+app.set("trust proxy", true);
 app.use(helmet());
 app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json({ limit: BODY_LIMIT }));

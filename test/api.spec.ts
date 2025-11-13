@@ -51,6 +51,20 @@ describe("POST /v1/scan", () => {
     });
   });
 
+  it("returns 200 when fail_on is none despite high severity findings", async () => {
+    const response = await request(app)
+      .post("/v1/scan")
+      .send({
+        subject: "Alert {{ user_email }}",
+        fail_on: "none"
+      })
+      .expect(200);
+
+    expect(response.body.ok).toBe(true);
+    expect(response.body.worst_severity).toBe("high");
+    expect(response.body.fail_on).toBe("none");
+  });
+
   it("respects allowlist entries and returns ok", async () => {
     const response = await request(app)
       .post("/v1/scan")
@@ -166,6 +180,18 @@ describe("POST /v1/scan/url", () => {
     await request(app).post("/v1/scan/url").send({ url: "https://cache.tld/item" }).expect(409);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors allowlist when scanning fetched HTML", async () => {
+    vi.spyOn(fetchModule, "fetchHtml").mockResolvedValue("<div>{{ safe_token }}</div>");
+
+    const response = await request(app)
+      .post("/v1/scan/url")
+      .send({ url: "https://example.com/safe", allowlist: ["{{ safe_token }}"] })
+      .expect(200);
+
+    expect(response.body.ok).toBe(true);
+    expect(response.body.severity_summary).toEqual({ high: 0, medium: 0, low: 0 });
   });
 
   it("returns 502 when fetch fails", async () => {

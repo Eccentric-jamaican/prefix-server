@@ -149,6 +149,22 @@ Recommended practices:
 - **Alerts**: configure alert rules for spikes in non-200 responses, especially 409s and 5xx, and alert on absence of metrics to detect ingestion failures. Include `Idempotency-Key` values in annotations to correlate duplicates.
 - **Synthetic checks**: schedule health probes (`/v1/health`) and smoke scans (allowlisted payload) to verify the scanner pipeline and upstream dependencies.
 
+## Operations Runbook
+
+- **Trust proxy aware rate limiting**: Prefix enables `app.set("trust proxy", true)` so Express honors Railway/ingress `X-Forwarded-*` headers. When deploying behind another proxy or load balancer, confirm it forwards client IPs; otherwise rate limiting will treat all requests as the same source.
+- **API key rotation**:
+  1. Generate a new key (or let Railway issue one) and update the service’s `API_KEY` env var.
+  2. Redeploy or restart the service so `requireApiKey` reads the new value.
+  3. Distribute the new bearer token to downstream automations, then revoke the old key.
+  In code and in `.env.example` the key stays under `API_KEY`; keep placeholders committed and never store live secrets.
+- **Post-deploy verification**:
+  - Run `npm test` to re-confirm the suite, including allowlist, `fail_on`, and cached URL coverage.
+  - Execute a smoke script (see `Invoke-PrefixRequest` example in the docs or Postman collection) that:
+    1. Hits `/v1/scan/rfc822` with a clean payload and expects `{"ok":true}`.
+    2. Submits a templated payload and confirms HTTP 409 with findings.
+    3. Calls `/v1/scan/url` and `/v1/scan` with allowlists to verify caching and bypass logic.
+  - Rotate the API key again if smoke tests required exposing it in terminals or logs.
+
 ## Testing & Linting
 
 ```bash
