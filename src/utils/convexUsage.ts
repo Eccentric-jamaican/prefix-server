@@ -4,14 +4,8 @@ import { ConvexError } from "convex/values";
 import type { Response } from "express";
 
 import { api } from "../../convex/_generated/api.js";
-import type { FunctionReference } from "convex/server";
 
-type UsageModule = {
-  reserveAndLog: FunctionReference<"mutation">;
-  finalize: FunctionReference<"mutation">;
-};
-
-const usageApi = (api as unknown as { usage: UsageModule }).usage;
+const usageApi = api.usage;
 
 export class InsufficientCreditsError extends Error {
   public readonly details?: Record<string, unknown>;
@@ -20,6 +14,13 @@ export class InsufficientCreditsError extends Error {
     super("Insufficient credits");
     this.name = "InsufficientCreditsError";
     this.details = details;
+  }
+}
+
+export class InvalidUsageCostError extends Error {
+  constructor(cost: number) {
+    super(`Invalid usage cost: ${cost}`);
+    this.name = "InvalidUsageCostError";
   }
 }
 
@@ -45,7 +46,12 @@ export async function reserveUsage(
   }
 
   const requestId = context.requestId ?? randomUUID();
-  const normalizedCost = Number.isFinite(cost) && cost > 0 ? cost : 1;
+
+  if (!Number.isFinite(cost) || cost < 0) {
+    throw new InvalidUsageCostError(cost);
+  }
+
+  const normalizedCost = cost;
 
   try {
     const reservation = await context.client.mutation(usageApi.reserveAndLog, {

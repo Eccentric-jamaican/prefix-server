@@ -9,7 +9,6 @@
     "strict": true,
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
 

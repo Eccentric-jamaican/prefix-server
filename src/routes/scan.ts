@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { z } from "zod";
 
 import { executeScan } from "./shared/executeScan.js";
-import { calculateScanCost } from "../utils/scanCost.js";
+import { calculateScanCost, type ScanSeverity } from "../utils/scanCost.js";
 import {
   finalizeUsage,
   InsufficientCreditsError,
@@ -41,7 +41,8 @@ router.post("/scan", async (req: Request, res: Response, next: NextFunction) => 
   }
 
   const { subject, html, text, allowlist, fail_on, context_hint } = parsed.data;
-  const cost = calculateScanCost({});
+  const requestedSeverity: ScanSeverity | undefined = fail_on === "none" ? undefined : fail_on;
+  const cost = calculateScanCost({ severity: requestedSeverity });
   const baseMetadata = {
     route: "scan",
     failOn: fail_on,
@@ -58,7 +59,8 @@ router.post("/scan", async (req: Request, res: Response, next: NextFunction) => 
         ...baseMetadata,
         subjectProvided: Boolean(subject),
         htmlProvided: Boolean(html),
-        textProvided: Boolean(text)
+        textProvided: Boolean(text),
+        requestedSeverity: requestedSeverity ?? "none"
       }
     });
   } catch (error) {

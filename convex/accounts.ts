@@ -36,7 +36,11 @@ export const createFromBetterAuth = mutation({
       await ctx.db.patch(existingUser._id, { lastLoginAt: now });
       const account = await ctx.db.get(existingUser.accountId);
       if (!account) {
-        throw new ConvexError("Account missing for existing user");
+        throw new ConvexError({
+          code: "account_missing_for_existing_user",
+          userId: existingUser._id,
+          accountId: existingUser.accountId
+        });
       }
 
       return {

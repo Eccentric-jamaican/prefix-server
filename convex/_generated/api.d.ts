@@ -10,8 +10,6 @@
 
 import type * as accounts from "../accounts.js";
 import type * as apiKeys from "../apiKeys.js";
-import type * as apis_issueApiKey from "../apis/issueApiKey.js";
-import type * as apis_issueApiKey from "../apis/issueApiKey.js";
 import type * as credits from "../credits.js";
 import type * as lib_apiKeys from "../lib/apiKeys.js";
 import type * as lib_constants from "../lib/constants.js";
@@ -27,8 +25,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   apiKeys: typeof apiKeys;
-  "apis/issueApiKey": typeof apis_issueApiKey;
-  "apis/issueApiKey": typeof apis_issueApiKey;
   credits: typeof credits;
   "lib/apiKeys": typeof lib_apiKeys;
   "lib/constants": typeof lib_constants;

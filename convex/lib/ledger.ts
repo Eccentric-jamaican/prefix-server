@@ -9,6 +9,7 @@ type AdjustCreditParams = {
   accountId: Id<"accounts">;
   delta: number;
   source: CreditSource;
+  apiKeyId?: Id<"apiKeys">;
   requestId?: string;
   notes?: string;
   metadata?: Record<string, unknown>;
@@ -27,6 +28,7 @@ export async function adjustCreditBalance({
   accountId,
   delta,
   source,
+  apiKeyId,
   requestId,
   notes,
   metadata,
@@ -35,6 +37,16 @@ export async function adjustCreditBalance({
   const timestamp = now ?? Date.now();
   const account = await getAccount(ctx, accountId);
   const previousBalance = account.creditBalance;
+
+  if (!Number.isFinite(delta) || !Number.isFinite(previousBalance)) {
+    throw new ConvexError({
+      code: "invalid_credit_delta",
+      accountId,
+      delta,
+      previousBalance
+    });
+  }
+
   const newBalance = previousBalance + delta;
 
   if (newBalance < 0) {
@@ -55,6 +67,7 @@ export async function adjustCreditBalance({
 
   const ledgerEntryId = await ctx.db.insert("creditLedger", {
     accountId,
+    keyId: apiKeyId,
     delta,
     source,
     requestId,

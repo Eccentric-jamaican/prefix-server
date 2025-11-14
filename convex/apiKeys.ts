@@ -88,7 +88,8 @@ export const revoke = mutation({
 
     await ctx.db.patch(args.apiKeyId, {
       revokedAt: now,
-      revokedReason: args.reason ?? undefined
+      revokedReason: args.reason ?? undefined,
+      revokedBy: args.revokedByUserId ?? undefined
     });
 
     return {
@@ -154,7 +155,8 @@ export const lookupByPrefix = query({
 });
 
 async function generateUniqueApiKey(ctx: MutationCtx): Promise<GeneratedApiKey> {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const generated = await generateApiKey();
     const collision = await ctx.db
       .query("apiKeys")
@@ -166,7 +168,8 @@ async function generateUniqueApiKey(ctx: MutationCtx): Promise<GeneratedApiKey> 
     }
   }
 
-  throw new ConvexError({ code: "api_key_generation_failed" });
+  console.error("Failed to generate unique API key after retries");
+  throw new ConvexError({ code: "api_key_generation_failed", attempts: maxAttempts });
 }
 
 export const verifySecret = query({

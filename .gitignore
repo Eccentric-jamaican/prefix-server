@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+convex/**/*.js
+convex/**/*.js.map
 
 # Environment files
 .env

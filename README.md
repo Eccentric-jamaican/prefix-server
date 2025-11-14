@@ -92,7 +92,6 @@ A blocking response returns HTTP 409 with a list of findings.
 | `URL_CACHE_TTL_MS`     | 30000   | TTL for URL fetch cache                        |
 | `URL_CACHE_MAX`        | 64      | Max entries in URL fetch cache                 |
 | `CONVEX_DEPLOYMENT_URL` / `CONVEX_URL` | – | Base URL for Convex deployment used by the server |
-| `CONVEX_ADMIN_TOKEN` / `CONVEX_ADMIN_AUTH_TOKEN` | – | Auth token used by the Convex HTTP client when reserving usage |
 
 ## Docker
 

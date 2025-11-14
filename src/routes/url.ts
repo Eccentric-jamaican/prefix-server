@@ -4,7 +4,7 @@ import { z } from "zod";
 import { FetchError, fetchHtml } from "../core/fetch.js";
 import { TtlLruCache } from "../utils/ttlLruCache.js";
 import { executeScan } from "./shared/executeScan.js";
-import { calculateScanCost } from "../utils/scanCost.js";
+import { calculateScanCost, type ScanSeverity } from "../utils/scanCost.js";
 import {
   finalizeUsage,
   InsufficientCreditsError,
@@ -40,14 +40,16 @@ router.post("/scan/url", async (req: Request, res: Response, next: NextFunction)
   }
 
   const { url, subject, allowlist, fail_on, context_hint } = parsed.data;
-  const cost = calculateScanCost({});
+  const requestedSeverity: ScanSeverity | undefined = fail_on === "none" ? undefined : fail_on;
+  const cost = calculateScanCost({ severity: requestedSeverity });
   const baseMetadata = {
     route: "scan:url",
     failOn: fail_on,
     contextHint: context_hint,
     allowlistCount: allowlist?.length ?? 0,
     reservedCost: cost,
-    subjectProvided: Boolean(subject)
+    subjectProvided: Boolean(subject),
+    requestedSeverity: requestedSeverity ?? "none"
   } satisfies Record<string, unknown>;
 
   try {
@@ -101,21 +103,23 @@ router.post("/scan/url", async (req: Request, res: Response, next: NextFunction)
       url
     } satisfies Record<string, unknown>;
 
+    const status = error instanceof FetchError ? (error.status === 404 ? 404 : 502) : 502;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
     await finalizeUsage(res, {
-      responseStatus: 502,
+      responseStatus: status,
       severity: undefined,
       metadata: {
         ...metadata,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: errorMessage
       }
     });
 
     if (error instanceof FetchError) {
-      const status = error.status === 404 ? 404 : 502;
-      return res.status(status).json({ ok: false, error: error.message });
+      return res.status(status).json({ ok: false, error: errorMessage });
     }
 
-    return res.status(502).json({ ok: false, error: "Failed to fetch URL" });
+    return res.status(status).json({ ok: false, error: "Failed to fetch URL" });
   }
 });
 

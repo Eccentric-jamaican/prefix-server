@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { parseRfc822 } from "../core/parse-rfc822.js";
 import { executeScan } from "./shared/executeScan.js";
-import { calculateScanCost } from "../utils/scanCost.js";
+import { calculateScanCost, type ScanSeverity } from "../utils/scanCost.js";
 import {
   finalizeUsage,
   InsufficientCreditsError,
@@ -38,7 +38,8 @@ router.post("/scan/rfc822", async (req: Request, res: Response, next: NextFuncti
     return res.status(400).json({ ok: false, error: "Unable to parse RFC822 message" });
   }
 
-  const cost = calculateScanCost({});
+  const requestedSeverity: ScanSeverity | undefined = fail_on === "none" ? undefined : fail_on;
+  const cost = calculateScanCost({ severity: requestedSeverity });
   const baseMetadata = {
     route: "scan:rfc822",
     failOn: fail_on,
@@ -47,7 +48,8 @@ router.post("/scan/rfc822", async (req: Request, res: Response, next: NextFuncti
     reservedCost: cost,
     subjectProvided: Boolean(subject),
     htmlProvided: Boolean(html),
-    textProvided: Boolean(text)
+    textProvided: Boolean(text),
+    requestedSeverity: requestedSeverity ?? "none"
   } satisfies Record<string, unknown>;
 
   try {

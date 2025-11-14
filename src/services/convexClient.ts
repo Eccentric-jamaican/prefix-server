@@ -1,7 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 
 export interface ConvexClientConfig {
-  authToken?: string;
+  userToken?: string;
 }
 
 export function createConvexClient(config: ConvexClientConfig = {}): ConvexHttpClient {
@@ -11,7 +11,7 @@ export function createConvexClient(config: ConvexClientConfig = {}): ConvexHttpC
   }
 
   return new ConvexHttpClient(convexUrl, {
-    auth: config.authToken ?? process.env.CONVEX_ADMIN_TOKEN ?? process.env.CONVEX_ADMIN_AUTH_TOKEN
+    auth: config.userToken
   });
 }
 

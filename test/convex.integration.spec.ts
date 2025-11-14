@@ -60,6 +60,7 @@ describe("Convex auth & usage integration", () => {
   let finalizeSpy: SpyInstance<FinalizeArgs, FinalizeReturn>;
 
   const originalConvexUrl = process.env.CONVEX_URL;
+  const originalApiKey = process.env.API_KEY;
 
   beforeEach(() => {
     process.env.CONVEX_URL = "https://convex.test";
@@ -77,6 +78,11 @@ describe("Convex auth & usage integration", () => {
 
   afterAll(() => {
     process.env.CONVEX_URL = originalConvexUrl;
+    if (originalApiKey === undefined) {
+      delete process.env.API_KEY;
+    } else {
+      process.env.API_KEY = originalApiKey;
+    }
   });
 
   it("allows Convex-authenticated requests and records usage", async () => {

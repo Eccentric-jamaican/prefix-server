@@ -5,24 +5,26 @@ import { type NextFunction, type Request, type Response } from "express";
 
 import { API_KEY_PREFIX_LENGTH } from "../../convex/lib/constants.js";
 import { api } from "../../convex/_generated/api.js";
-import type { FunctionReference } from "convex/server";
 
-type ApiKeysModule = {
-  lookupByPrefix: FunctionReference<"query">;
-  verifySecret: FunctionReference<"query">;
-  markUsed: FunctionReference<"mutation">;
-};
-
-const apiKeys = (api as unknown as { apiKeys: ApiKeysModule }).apiKeys;
+const apiKeys = api.apiKeys;
 import { createConvexClient } from "../services/convexClient.js";
 
 const BEARER_PREFIX = "Bearer ";
 
 export function requireApiKey(req: Request, res: Response, next: NextFunction): void {
   const convexUrlConfigured = Boolean(process.env.CONVEX_DEPLOYMENT_URL ?? process.env.CONVEX_URL);
+  const legacyApiKey = process.env.API_KEY;
 
   if (!convexUrlConfigured) {
-    legacyApiKeyCheck(req, res, next);
+    if (!legacyApiKey) {
+      const message =
+        "API authentication misconfigured: set CONVEX_DEPLOYMENT_URL/CONVEX_URL or API_KEY";
+      console.error(message);
+      res.status(500).json({ ok: false, error: "Server misconfiguration" });
+      return;
+    }
+
+    legacyApiKeyCheck(req, res, next, legacyApiKey);
     return;
   }
 
@@ -100,14 +102,12 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction): 
   });
 }
 
-function legacyApiKeyCheck(req: Request, res: Response, next: NextFunction): void {
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    next();
-    return;
-  }
-
+function legacyApiKeyCheck(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  apiKey: string
+): void {
   const header = req.header("Authorization");
   if (!header?.startsWith(BEARER_PREFIX)) {
     res.status(401).json({ ok: false, error: "Unauthorized" });

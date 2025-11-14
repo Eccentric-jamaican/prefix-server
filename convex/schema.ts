@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 const timestamp = () => v.number();
+const jsonScalar = () => v.union(v.string(), v.number(), v.boolean(), v.null());
 
 export default defineSchema({
   accounts: defineTable({
@@ -21,7 +22,9 @@ export default defineSchema({
     espMetadata: v.optional(
       v.object({
         provider: v.optional(v.string()),
-        data: v.optional(v.any())
+        // Provider-specific scalar metadata (ids/status flags/etc.). Use a record of JSON scalars to
+        // avoid fully untyped blobs while keeping flexibility for future providers.
+        data: v.optional(v.record(v.string(), jsonScalar()))
       })
     ),
     createdAt: timestamp(),
@@ -47,6 +50,7 @@ export default defineSchema({
     createdBy: v.id("users"),
     createdAt: timestamp(),
     revokedAt: v.optional(timestamp()),
+    revokedBy: v.optional(v.id("users")),
     revokedReason: v.optional(v.string()),
     lastUsedAt: v.optional(timestamp())
   })
@@ -64,10 +68,13 @@ export default defineSchema({
     requestId: v.optional(v.string()),
     notes: v.optional(v.string()),
     metadata: v.optional(v.record(v.string(), v.any())),
+    keyId: v.optional(v.id("apiKeys")),
     createdAt: timestamp()
   })
     .index("byAccount", ["accountId"])
-    .index("byRequestId", ["requestId"]),
+    .index("byRequestId", ["requestId"])
+    .index("byAccountAndRequestId", ["accountId", "requestId"])
+    .index("byAccountKeyAndRequestId", ["accountId", "keyId", "requestId"]),
   usageEvents: defineTable({
     accountId: v.id("accounts"),
     keyId: v.id("apiKeys"),
@@ -81,7 +88,23 @@ export default defineSchema({
     createdAt: timestamp()
   })
     .index("byAccount", ["accountId", "createdAt"])
-    .index("byRequestId", ["requestId"]),
+    .index("byRequestId", ["requestId"])
+    .index("byAccountAndRequestId", ["accountId", "requestId"])
+    .index("byAccountKeyAndRequestId", ["accountId", "keyId", "requestId"]),
+  apiKeyVerificationAttempts: defineTable({
+    scopeType: v.union(v.literal("account"), v.literal("ip")),
+    accountId: v.optional(v.id("accounts")),
+    ip: v.optional(v.string()),
+    idPrefix: v.string(),
+    timestamp: timestamp(),
+    success: v.boolean(),
+    callerUserId: v.optional(v.id("users")),
+    callerAccountId: v.optional(v.id("accounts"))
+  })
+    .index("byAccount", ["accountId", "timestamp"])
+    .index("byIp", ["ip", "timestamp"])
+    .index("byIdPrefix", ["idPrefix", "timestamp"])
+    .index("byCaller", ["callerAccountId", "timestamp"]),
   webhookEvents: defineTable({
     source: v.union(v.literal("polar"), v.literal("betterauth")),
     externalId: v.string(),

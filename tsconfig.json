@@ -17,7 +17,8 @@
     "src/types/**/*.d.ts",
     "test/**/*.ts",
     "convex/**/*.ts",
-    "convex/**/*.d.ts"
+    "convex/**/*.d.ts",
+    "shared/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

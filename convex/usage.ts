@@ -52,24 +52,19 @@ export const reserveAndLog = mutation({
       throw new ConvexError({ code: "invalid_cost", cost: args.cost });
     }
 
-    const account = await ctx.db.get(args.accountId);
-    if (!account) {
-      throw new ConvexError({ code: "account_not_found", accountId: args.accountId });
-    }
-
-    if (account.status === "canceled") {
-      throw new ConvexError({ code: "account_inactive", accountId: args.accountId });
-    }
-
     const existingUsage = await ctx.db
       .query("usageEvents")
-      .withIndex("byRequestId", (q) => q.eq("requestId", args.requestId))
+      .withIndex("byAccountAndRequestId", (q) =>
+        q.eq("accountId", args.accountId).eq("requestId", args.requestId)
+      )
       .unique();
 
     if (existingUsage) {
       const ledger = await ctx.db
         .query("creditLedger")
-        .withIndex("byRequestId", (q) => q.eq("requestId", args.requestId))
+        .withIndex("byAccountKeyAndRequestId", (q) =>
+          q.eq("accountId", args.accountId).eq("keyId", args.apiKeyId).eq("requestId", args.requestId)
+        )
         .unique();
 
       if (!ledger) {
@@ -77,6 +72,11 @@ export const reserveAndLog = mutation({
           code: "missing_ledger_for_request",
           requestId: args.requestId
         });
+      }
+
+      const account = await ctx.db.get(args.accountId);
+      if (!account) {
+        throw new ConvexError({ code: "account_not_found", accountId: args.accountId });
       }
 
       return {
@@ -87,9 +87,19 @@ export const reserveAndLog = mutation({
       };
     }
 
+    const account = await ctx.db.get(args.accountId);
+    if (!account) {
+      throw new ConvexError({ code: "account_not_found", accountId: args.accountId });
+    }
+
+    if (account.status === "canceled") {
+      throw new ConvexError({ code: "account_inactive", accountId: args.accountId });
+    }
+
     const ledger = await adjustCreditBalance({
       ctx,
       accountId: args.accountId,
+      apiKeyId: args.apiKeyId,
       delta: -Math.abs(args.cost),
       source: "usage",
       requestId: args.requestId,
