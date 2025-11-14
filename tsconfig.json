@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "allowJs": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
@@ -11,6 +12,13 @@
     "resolveJsonModule": true,
     "types": ["node", "vitest"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/types/**/*.d.ts",
+    "test/**/*.ts",
+    "convex/**/*.ts",
+    "convex/**/*.d.ts",
+    "shared/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }

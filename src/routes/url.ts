@@ -1,9 +1,15 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { FetchError, fetchHtml } from "../core/fetch.js";
 import { TtlLruCache } from "../utils/ttlLruCache.js";
 import { executeScan } from "./shared/executeScan.js";
+import { calculateScanCost, type ScanSeverity } from "../utils/scanCost.js";
+import {
+  finalizeUsage,
+  InsufficientCreditsError,
+  reserveUsage
+} from "../utils/convexUsage.js";
 
 const router = Router();
 
@@ -23,7 +29,7 @@ const urlSchema = z.object({
   context_hint: z.string().optional()
 });
 
-router.post("/scan/url", async (req, res) => {
+router.post("/scan/url", async (req: Request, res: Response, next: NextFunction) => {
   const parsed = urlSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -34,6 +40,38 @@ router.post("/scan/url", async (req, res) => {
   }
 
   const { url, subject, allowlist, fail_on, context_hint } = parsed.data;
+  const requestedSeverity: ScanSeverity | undefined = fail_on === "none" ? undefined : fail_on;
+  const cost = calculateScanCost({ severity: requestedSeverity });
+  const baseMetadata = {
+    route: "scan:url",
+    failOn: fail_on,
+    contextHint: context_hint,
+    allowlistCount: allowlist?.length ?? 0,
+    reservedCost: cost,
+    subjectProvided: Boolean(subject),
+    requestedSeverity: requestedSeverity ?? "none"
+  } satisfies Record<string, unknown>;
+
+  try {
+    await reserveUsage(res, {
+      scanType: "scan:url",
+      cost,
+      metadata: {
+        ...baseMetadata,
+        url
+      }
+    });
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return res.status(402).json({
+        ok: false,
+        error: error.message,
+        details: error.details ?? {}
+      });
+    }
+
+    return next(error);
+  }
 
   try {
     const cached = urlCache.get(url);
@@ -41,15 +79,47 @@ router.post("/scan/url", async (req, res) => {
     if (!cached) {
       urlCache.set(url, html);
     }
+
     const result = executeScan({ subject, html, allowlist, fail_on, context_hint });
-    return res.status(result.status).json(result.body);
+    const responseStatus = result.status;
+    const responseBody = result.body;
+
+    await finalizeUsage(res, {
+      responseStatus,
+      severity: responseBody.worst_severity ?? undefined,
+      metadata: {
+        ...baseMetadata,
+        url,
+        cached: Boolean(cached),
+        findingsCount: responseBody.findings.length,
+        ok: responseBody.ok
+      }
+    });
+
+    return res.status(responseStatus).json(responseBody);
   } catch (error) {
+    const metadata = {
+      ...baseMetadata,
+      url
+    } satisfies Record<string, unknown>;
+
+    const status = error instanceof FetchError ? (error.status === 404 ? 404 : 502) : 502;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    await finalizeUsage(res, {
+      responseStatus: status,
+      severity: undefined,
+      metadata: {
+        ...metadata,
+        error: errorMessage
+      }
+    });
+
     if (error instanceof FetchError) {
-      const status = error.status === 404 ? 404 : 502;
-      return res.status(status).json({ ok: false, error: error.message });
+      return res.status(status).json({ ok: false, error: errorMessage });
     }
 
-    return res.status(502).json({ ok: false, error: "Failed to fetch URL" });
+    return res.status(status).json({ ok: false, error: "Failed to fetch URL" });
   }
 });
 
