@@ -91,6 +91,8 @@ A blocking response returns HTTP 409 with a list of findings.
 | `FETCH_TIMEOUT_MS`     | 7000    | URL fetch timeout                              |
 | `URL_CACHE_TTL_MS`     | 30000   | TTL for URL fetch cache                        |
 | `URL_CACHE_MAX`        | 64      | Max entries in URL fetch cache                 |
+| `CONVEX_DEPLOYMENT_URL` / `CONVEX_URL` | – | Base URL for Convex deployment used by the server |
+| `CONVEX_ADMIN_TOKEN` / `CONVEX_ADMIN_AUTH_TOKEN` | – | Auth token used by the Convex HTTP client when reserving usage |
 
 ## Docker
 
@@ -157,6 +159,11 @@ Recommended practices:
   2. Redeploy or restart the service so `requireApiKey` reads the new value.
   3. Distribute the new bearer token to downstream automations, then revoke the old key.
   In code and in `.env.example` the key stays under `API_KEY`; keep placeholders committed and never store live secrets.
+- **Credit reconciliation**:
+  1. Use the Convex dashboard or CLI to inspect `creditLedger` entries filtered by `requestId` or `metadata.scanType` when auditing specific scans.
+  2. Cross-check the most recent `usageEvents` records (ordered by `createdAt`) to ensure each reservation has a finalized status/severity.
+  3. Alert on low balances by monitoring `accounts.creditBalance` against `DEFAULT_LOW_CREDIT_THRESHOLD` (Convex scheduled functions can emit notifications).
+  4. When reversing charges, call the Convex `credits.applyDelta` mutation with a positive `delta` and matching `requestId` metadata to maintain an audit trail.
 - **Post-deploy verification**:
   - Run `npm test` to re-confirm the suite, including allowlist, `fail_on`, and cached URL coverage.
   - Execute a smoke script (see `Invoke-PrefixRequest` example in the docs or Postman collection) that:
