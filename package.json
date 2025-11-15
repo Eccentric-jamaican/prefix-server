@@ -10,7 +10,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.build.json",
     "prestart": "npm run build",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "test": "vitest run",
