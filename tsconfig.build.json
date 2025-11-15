@@ -5,6 +5,11 @@
     "rootDir": ".",
     "noEmit": false
   },
-  "include": ["src/**/*.ts", "convex/**/*.ts", "shared/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "convex/**/*.ts",
+    "convex/_generated/**/*.js",
+    "shared/**/*.ts"
+  ],
   "exclude": ["test", "**/*.spec.ts"]
 }
