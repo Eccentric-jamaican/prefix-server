@@ -18,6 +18,25 @@
 2. Update Prefix server middleware to delegate auth + quotas to Convex. ✅ (2025-11-14)
 3. Build automated tests (Convex + server) covering credit adjustments and usage logging. ✅ (2025-11-14)
 4. Document operational runbooks for credit reconciliation and webhook retries. ✅ (2025-11-14)
+5. Seed Polar product catalog (sandbox) and record IDs. ✅ (2025-11-15)
+   - Starter: `b05dac02-5a09-40fa-8255-0ab05bdc8c16`
+   - Growth: `49580b8e-f109-4381-bb08-325cec7e5502`
+   - Scale: `da6fbebf-bf7a-4bb5-81fb-9246f0bddba7`
+6. Provision Polar credit benefits + attach to products (sandbox). ✅ (2025-11-15)
+   - Starter benefit: `e29b989c-942e-4f90-a857-df9c387755cc`
+   - Growth benefit: `2e045371-de74-49bc-bf40-4484c8481d61`
+   - Scale benefit: `a0d7f423-74d7-4f13-904e-9a7c133130a0`
+7. Extend Convex onboarding to use Polar plan definitions + paid plan grants. ✅ (2025-11-15)
+   - `createFromBetterAuth` accepts `planKey` and stores Polar product/benefit ids.
+   - Added `accounts.assignPlan` for upgrades + idempotent credit grants.
+   - Accounts schema now tracks `polarProductId`, `polarBenefitId`, `creditsPerCycle`, `planAssignedAt`.
+   - ✅ Added `test/convex.accounts.spec.ts` (Vitest) to assert plan metadata persistence in `handleCreateFromBetterAuth` and credit grants in `handleAssignPlan` using mocked ledgers (2025-11-15).
+
+**Up next (billing):**
+- Write Polar webhook handler to sync subscription lifecycle → Convex `assignPlan` / credit refills.
+- Persist benefit IDs / plan metadata in frontend onboarding (BetterAuth UI) & expose plan picker.
+- Decide meter integration vs custom benefits before production seed; capture meter IDs via env.
+- Add operational runbook for rerunning product/benefit seeders.
 
 ## 3. Medium-Term Tasks
 - Polar checkout integration within dashboard.
@@ -36,4 +55,4 @@
 - **2025-11-13**: Initial roadmap created to track expanding integration scope.
 
 ---
-_Last updated: 2025-11-13_
+_Last updated: 2025-11-15_

@@ -5,6 +5,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import metricsRouter from "./routes/metrics.js";
 import rfc822Router from "./routes/rfc822.js";
 import schemaRouter from "./routes/schema.js";
@@ -65,7 +67,11 @@ app.use("/v1", metricsRouter);
 
 app.use(errorHandler);
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectEntry =
+  typeof process.argv[1] === "string" &&
+  pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+
+if (isDirectEntry) {
   app.listen(PORT, () => {
     logger.info({ port: PORT }, "Prefix server listening");
   });

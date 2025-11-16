@@ -92,6 +92,37 @@ A blocking response returns HTTP 409 with a list of findings.
 | `URL_CACHE_TTL_MS`     | 30000   | TTL for URL fetch cache                        |
 | `URL_CACHE_MAX`        | 64      | Max entries in URL fetch cache                 |
 | `CONVEX_DEPLOYMENT_URL` / `CONVEX_URL` | – | Base URL for Convex deployment used by the server |
+| `POLAR_ACCESS_TOKEN` / `POLAR_SANDBOX_ACCESS_TOKEN` | – | Organization access tokens for Polar API (prod vs sandbox) |
+| `POLAR_API_BASE_URL` / `POLAR_SANDBOX_API_BASE_URL` | Polar defaults | Override API base URLs when needed |
+| `POLAR_CREDITS_METER_ID` / `POLAR_SANDBOX_CREDITS_METER_ID` | – | Optional Polar meter IDs for issuing credit benefits; leave blank to fall back to custom benefits |
+
+### Polar product seeding
+
+Provision the SaaS plans inside Polar once the env tokens are configured:
+
+```bash
+# seed sandbox (default)
+npm run polar:seed
+
+# seed production (uses POLAR_ACCESS_TOKEN / POLAR_API_BASE_URL)
+npm run polar:seed:prod
+```
+
+The script is idempotent: it looks up products by `metadata.plan_id` and only creates missing ones. Capture the returned product IDs (printed in the console) and store them in Convex/BetterAuth onboarding flows as needed.
+
+### Polar benefit seeding
+
+Provision per-plan credit benefits so that Polar subscriptions grant the right entitlements:
+
+```bash
+# seed sandbox (default)
+npm run polar:benefits
+
+# seed production (uses POLAR_ACCESS_TOKEN / POLAR_API_BASE_URL)
+npm run polar:benefits:prod
+```
+
+If `POLAR_CREDITS_METER_ID` (or the sandbox variant) is set, benefits will be created as meter-credit benefits targeting that meter; otherwise the script falls back to custom benefits with credit metadata. The script also attaches benefits to the matching products and prints both product and benefit IDs for wiring into Convex.
 
 ## Docker
 
