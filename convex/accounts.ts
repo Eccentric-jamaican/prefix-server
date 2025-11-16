@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server.js";
 import type { MutationCtx } from "./_generated/server.js";
 import type { Id } from "./_generated/dataModel.js";
 import { ConvexError, v } from "convex/values";
+import { authComponent } from "./auth.js";
 
 import {
   DEFAULT_LOW_CREDIT_THRESHOLD,
@@ -42,6 +43,46 @@ export const getAccountBillingContext = query({
       planId: account.planId,
       polarCustomerId: account.polarCustomerId ?? undefined,
     };
+  },
+});
+
+export const getAccountForCurrentUser = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      accountId: v.id("accounts"),
+      userId: v.id("users"),
+      role: v.union(v.literal("owner"), v.literal("member")),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const authUser = await authComponent.getAuthUser(ctx);
+    if (!authUser) {
+      return null;
+    }
+
+    const betterAuthUserId =
+      typeof authUser.userId === "string" && authUser.userId.length > 0
+        ? authUser.userId
+        : authUser._id;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byBetterAuthUserId", (q) =>
+        q.eq("betterAuthUserId", betterAuthUserId),
+      )
+      .unique();
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      accountId: user.accountId,
+      userId: user._id,
+      role: user.role,
+    } as const;
   },
 });
 

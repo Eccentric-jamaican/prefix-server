@@ -29,14 +29,31 @@ export async function handleCreateCheckoutSession(
     throw new ConvexError({ code: "unknown_plan_key", planKey: args.planKey });
   }
 
+  const membership = await ctx.runQuery(api.accounts.getAccountForCurrentUser, {});
+  if (!membership) {
+    throw new ConvexError({ code: "not_authenticated" });
+  }
+
+  if (membership.role !== "owner") {
+    throw new ConvexError({ code: "insufficient_permissions", role: membership.role });
+  }
+
+  if (membership.accountId !== args.accountId) {
+    throw new ConvexError({
+      code: "account_mismatch",
+      requestedAccountId: args.accountId,
+      membershipAccountId: membership.accountId,
+    });
+  }
+
   const account = await ctx.runQuery(api.accounts.getAccountBillingContext, {
-    accountId: args.accountId,
+    accountId: membership.accountId,
   });
 
   if (!account) {
     throw new ConvexError({
       code: "account_not_found",
-      accountId: args.accountId,
+      accountId: membership.accountId,
     });
   }
 

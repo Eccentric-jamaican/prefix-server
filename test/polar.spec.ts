@@ -42,12 +42,18 @@ describe("handleCreateCheckoutSession", () => {
     });
   });
 
-  it("returns checkout session details when account and plan exist", async () => {
-    runQueryMock.mockResolvedValue({
-      accountId: baseArgs.accountId,
-      planId: POLAR_PLAN_DEFINITIONS.starter.planId,
-      polarCustomerId: "customer_1",
-    });
+  it("returns checkout session details when authenticated owner creates session", async () => {
+    runQueryMock
+      .mockResolvedValueOnce({
+        accountId: baseArgs.accountId,
+        userId: "users_1",
+        role: "owner",
+      })
+      .mockResolvedValueOnce({
+        accountId: baseArgs.accountId,
+        planId: POLAR_PLAN_DEFINITIONS.starter.planId,
+        polarCustomerId: "customer_1",
+      });
 
     const result = await handleCreateCheckoutSession(ctx, baseArgs);
 
@@ -73,8 +79,50 @@ describe("handleCreateCheckoutSession", () => {
     expect(runQueryMock).not.toHaveBeenCalled();
   });
 
+  it("throws when membership lookup fails", async () => {
+    runQueryMock.mockResolvedValueOnce(null);
+
+    await expect(handleCreateCheckoutSession(ctx, baseArgs)).rejects.toMatchObject({
+      data: expect.objectContaining({ code: "not_authenticated" }),
+    });
+
+    expect(runQueryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when membership role is not owner", async () => {
+    runQueryMock
+      .mockResolvedValueOnce({
+        accountId: baseArgs.accountId,
+        userId: "users_1",
+        role: "member",
+      });
+
+    await expect(handleCreateCheckoutSession(ctx, baseArgs)).rejects.toMatchObject({
+      data: expect.objectContaining({ code: "insufficient_permissions" }),
+    });
+  });
+
+  it("throws when membership account does not match requested account", async () => {
+    runQueryMock
+      .mockResolvedValueOnce({
+        accountId: "accounts_other",
+        userId: "users_1",
+        role: "owner",
+      });
+
+    await expect(handleCreateCheckoutSession(ctx, baseArgs)).rejects.toMatchObject({
+      data: expect.objectContaining({ code: "account_mismatch" }),
+    });
+  });
+
   it("throws when account cannot be found", async () => {
-    runQueryMock.mockResolvedValue(null);
+    runQueryMock
+      .mockResolvedValueOnce({
+        accountId: baseArgs.accountId,
+        userId: "users_1",
+        role: "owner",
+      })
+      .mockResolvedValueOnce(null);
 
     await expect(handleCreateCheckoutSession(ctx, baseArgs)).rejects.toMatchObject({
       data: expect.objectContaining({ code: "account_not_found" }),

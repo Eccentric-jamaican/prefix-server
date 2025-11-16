@@ -345,7 +345,7 @@ async function getUserByBetterAuthId(ctx: AnyCtx, betterAuthUserId: string) {
 
 import type { Doc } from "./_generated/dataModel.js";
 
-async function getOrCreateUserByBetterAuthId(ctx: AnyCtx, betterAuthUserId: string): Promise<Doc<"users">> {
+async function getOrCreateUserByBetterAuthId(ctx: MutationCtx, betterAuthUserId: string): Promise<Doc<"users">> {
   const existing = await ctx.db
     .query("users")
     .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
@@ -355,11 +355,7 @@ async function getOrCreateUserByBetterAuthId(ctx: AnyCtx, betterAuthUserId: stri
     return existing;
   }
 
-  if (!("mutation" in ctx)) {
-    throw new ConvexError({ code: "user_not_found", betterAuthUserId });
-  }
-
-  const authUserDoc = await authComponent.getAuthUser(ctx as MutationCtx);
+  const authUserDoc = await authComponent.getAuthUser(ctx);
   if (!authUserDoc) {
     throw new ConvexError({ code: "not_authenticated" });
   }
@@ -367,7 +363,7 @@ async function getOrCreateUserByBetterAuthId(ctx: AnyCtx, betterAuthUserId: stri
   const email = typeof authUserDoc.email === "string" ? authUserDoc.email : undefined;
   const name = typeof authUserDoc.name === "string" ? authUserDoc.name : "Prefix User";
 
-  const account = await createAccountForRecoveredUser(ctx as MutationCtx, {
+  const account = await createAccountForRecoveredUser(ctx, {
     betterAuthUserId,
     email,
     name,
