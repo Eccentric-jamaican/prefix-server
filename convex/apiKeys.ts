@@ -5,6 +5,8 @@ import type { Id } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { generateApiKey, hashApiKey, type GeneratedApiKey } from "./lib/apiKeys.js";
 import { authComponent } from "./auth.js";
+import { adjustCreditBalance } from "./lib/ledger.js";
+import { TRIAL_CREDIT_GRANT, DEFAULT_LOW_CREDIT_THRESHOLD } from "../shared/constants.js";
 
 const apiKeyResponseValidator = v.object({
   apiKeyId: v.id("apiKeys"),
@@ -375,7 +377,7 @@ async function createAccountForRecoveredUser(
     planId: "trial",
     status: "trial",
     creditBalance: 0,
-    lowCreditThreshold: 200,
+    lowCreditThreshold: DEFAULT_LOW_CREDIT_THRESHOLD,
     createdAt: now,
     updatedAt: now,
     creditRefillAt: now,
@@ -390,6 +392,20 @@ async function createAccountForRecoveredUser(
   });
 
   await ctx.db.patch(accountId, { ownerUserId: userId });
+
+  // Grant trial credits to recovered users
+  await adjustCreditBalance({
+    ctx,
+    accountId,
+    delta: TRIAL_CREDIT_GRANT,
+    source: "plan_grant",
+    notes: "Trial signup grant (recovered user)",
+    metadata: {
+      reason: "trial_signup_recovered",
+      betterAuthUserId,
+    },
+    now,
+  });
 
   const user = await ctx.db.get(userId);
   if (!user) {
