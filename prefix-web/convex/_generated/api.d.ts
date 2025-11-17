@@ -67,6 +67,11 @@ export declare const components: {
                   name: string;
                   phoneNumber?: null | string;
                   phoneNumberVerified?: null | boolean;
+                  planKey?: null | string;
+                  polarBenefitId?: null | string;
+                  polarCreditsPerCycle?: null | number;
+                  polarPlanId?: null | string;
+                  polarProductId?: null | string;
                   twoFactorEnabled?: null | boolean;
                   updatedAt: number;
                   userId?: null | string;
@@ -221,6 +226,11 @@ export declare const components: {
                     | "phoneNumber"
                     | "phoneNumberVerified"
                     | "userId"
+                    | "planKey"
+                    | "polarPlanId"
+                    | "polarProductId"
+                    | "polarBenefitId"
+                    | "polarCreditsPerCycle"
                     | "_id";
                   operator?:
                     | "lt"
@@ -631,6 +641,11 @@ export declare const components: {
                     | "phoneNumber"
                     | "phoneNumberVerified"
                     | "userId"
+                    | "planKey"
+                    | "polarPlanId"
+                    | "polarProductId"
+                    | "polarBenefitId"
+                    | "polarCreditsPerCycle"
                     | "_id";
                   operator?:
                     | "lt"
@@ -1131,6 +1146,11 @@ export declare const components: {
                   name?: string;
                   phoneNumber?: null | string;
                   phoneNumberVerified?: null | boolean;
+                  planKey?: null | string;
+                  polarBenefitId?: null | string;
+                  polarCreditsPerCycle?: null | number;
+                  polarPlanId?: null | string;
+                  polarProductId?: null | string;
                   twoFactorEnabled?: null | boolean;
                   updatedAt?: number;
                   userId?: null | string;
@@ -1152,6 +1172,11 @@ export declare const components: {
                     | "phoneNumber"
                     | "phoneNumberVerified"
                     | "userId"
+                    | "planKey"
+                    | "polarPlanId"
+                    | "polarProductId"
+                    | "polarBenefitId"
+                    | "polarCreditsPerCycle"
                     | "_id";
                   operator?:
                     | "lt"
@@ -1646,6 +1671,11 @@ export declare const components: {
                   name?: string;
                   phoneNumber?: null | string;
                   phoneNumberVerified?: null | boolean;
+                  planKey?: null | string;
+                  polarBenefitId?: null | string;
+                  polarCreditsPerCycle?: null | number;
+                  polarPlanId?: null | string;
+                  polarProductId?: null | string;
                   twoFactorEnabled?: null | boolean;
                   updatedAt?: number;
                   userId?: null | string;
@@ -1667,6 +1697,11 @@ export declare const components: {
                     | "phoneNumber"
                     | "phoneNumberVerified"
                     | "userId"
+                    | "planKey"
+                    | "polarPlanId"
+                    | "polarProductId"
+                    | "polarBenefitId"
+                    | "polarCreditsPerCycle"
                     | "_id";
                   operator?:
                     | "lt"

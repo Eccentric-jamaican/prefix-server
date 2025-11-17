@@ -2,8 +2,11 @@ import { ConvexError, v } from "convex/values";
 
 import { mutation, query } from "./_generated/server.js";
 import type { Id } from "./_generated/dataModel.js";
-import type { MutationCtx } from "./_generated/server.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { generateApiKey, hashApiKey, type GeneratedApiKey } from "./lib/apiKeys.js";
+import { authComponent } from "./auth.js";
+import { adjustCreditBalance } from "./lib/ledger.js";
+import { TRIAL_CREDIT_GRANT, DEFAULT_LOW_CREDIT_THRESHOLD } from "../shared/constants.js";
 
 const apiKeyResponseValidator = v.object({
   apiKeyId: v.id("apiKeys"),
@@ -13,50 +16,41 @@ const apiKeyResponseValidator = v.object({
   revokedAt: v.optional(v.number())
 });
 
+const apiKeyIssueReturnValidator = v.object({
+  apiKeyId: v.id("apiKeys"),
+  secret: v.string(),
+  prefix: v.string()
+});
+
 export const issue = mutation({
   args: {
     accountId: v.id("accounts"),
     createdByUserId: v.id("users"),
     label: v.optional(v.string())
   },
-  returns: v.object({
-    apiKeyId: v.id("apiKeys"),
-    secret: v.string(),
-    prefix: v.string()
-  }),
+  returns: apiKeyIssueReturnValidator,
   handler: async (ctx, args) => {
-    const account = await ctx.db.get(args.accountId);
-    if (!account) {
-      throw new ConvexError({ code: "account_not_found", accountId: args.accountId });
-    }
-
-    const user = await ctx.db.get(args.createdByUserId);
-    if (!user || user.accountId !== args.accountId) {
-      throw new ConvexError({
-        code: "user_not_in_account",
-        accountId: args.accountId,
-        userId: args.createdByUserId
-      });
-    }
-
-    const now = Date.now();
-    const generated = await generateUniqueApiKey(ctx);
-
-    const apiKeyId = await ctx.db.insert("apiKeys", {
-      accountId: args.accountId,
-      idPrefix: generated.prefix,
-      hash: generated.hash,
-      label: args.label,
-      createdBy: args.createdByUserId,
-      createdAt: now
-    });
-
-    return {
-      apiKeyId,
-      secret: generated.secret,
-      prefix: generated.prefix
-    };
+    return performIssue(ctx, args.accountId, args.createdByUserId, args.label ?? undefined);
   }
+});
+
+export const issueForCurrentUser = mutation({
+  args: {
+    label: v.optional(v.string())
+  },
+  returns: apiKeyIssueReturnValidator,
+  handler: async (ctx, args) => {
+    const { betterAuthUserId } = await requireAuthenticatedUser(ctx);
+    const user = await getOrCreateUserByBetterAuthId(ctx, betterAuthUserId);
+
+    return performIssue(ctx, user.accountId, user._id, args.label ?? undefined);
+  }
+});
+
+const apiKeyRevokeReturnValidator = v.object({
+  apiKeyId: v.id("apiKeys"),
+  revokedAt: v.number(),
+  alreadyRevoked: v.boolean()
 });
 
 export const revoke = mutation({
@@ -65,15 +59,54 @@ export const revoke = mutation({
     revokedByUserId: v.optional(v.id("users")),
     reason: v.optional(v.string())
   },
-  returns: v.object({
-    apiKeyId: v.id("apiKeys"),
-    revokedAt: v.optional(v.number()),
-    alreadyRevoked: v.boolean()
-  }),
+  returns: apiKeyRevokeReturnValidator,
   handler: async (ctx, args) => {
+    const apiKey = await ctx.db.get(args.apiKeyId);
+    if (!apiKey) {
+      throw new ConvexError({ code: "api_key_not_found", apiKeyId: args.apiKeyId });
+    }
+
+    if (apiKey.revokedAt) {
+      return {
+        apiKeyId: apiKey._id,
+        revokedAt: apiKey.revokedAt,
+        alreadyRevoked: true
+      };
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.apiKeyId, {
+      revokedAt: now,
+      revokedReason: args.reason ?? undefined,
+      revokedBy: args.revokedByUserId ?? undefined
+    });
+
+    return {
+      apiKeyId: args.apiKeyId,
+      revokedAt: now,
+      alreadyRevoked: false
+    };
+  }
+});
+
+export const revokeForCurrentUser = mutation({
+  args: {
+    apiKeyId: v.id("apiKeys"),
+    reason: v.optional(v.string())
+  },
+  returns: apiKeyRevokeReturnValidator,
+  handler: async (ctx, args) => {
+    const { betterAuthUserId } = await requireAuthenticatedUser(ctx);
+    const user = await getOrCreateUserByBetterAuthId(ctx, betterAuthUserId);
+
     const key = await ctx.db.get(args.apiKeyId);
     if (!key) {
       throw new ConvexError({ code: "api_key_not_found", apiKeyId: args.apiKeyId });
+    }
+
+    if (key.accountId !== user.accountId) {
+      throw new ConvexError({ code: "api_key_wrong_account", apiKeyId: args.apiKeyId });
     }
 
     if (key.revokedAt) {
@@ -89,7 +122,7 @@ export const revoke = mutation({
     await ctx.db.patch(args.apiKeyId, {
       revokedAt: now,
       revokedReason: args.reason ?? undefined,
-      revokedBy: args.revokedByUserId ?? undefined
+      revokedBy: user._id
     });
 
     return {
@@ -154,6 +187,59 @@ export const lookupByPrefix = query({
   }
 });
 
+const apiKeyListEntryValidator = v.object({
+  apiKeyId: v.id("apiKeys"),
+  label: v.optional(v.string()),
+  idPrefix: v.string(),
+  createdAt: v.number(),
+  lastUsedAt: v.optional(v.number()),
+  revokedAt: v.optional(v.number())
+});
+
+export const listForCurrentUser = query({
+  args: {},
+  returns: v.array(apiKeyListEntryValidator),
+  handler: async (ctx) => {
+    const authUser = await authComponent.getAuthUser(ctx);
+
+    if (!authUser) {
+      console.warn("Unauthenticated listForCurrentUser call; returning empty list");
+      return [];
+    }
+
+    // Better Auth 0.9+ uses _id as the primary identifier
+    const betterAuthUserId = authUser._id;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
+      .unique();
+
+    if (!user) {
+      console.warn(
+        "BetterAuth user is missing Convex user record; returning empty API key list",
+        { betterAuthUserId },
+      );
+      return [];
+    }
+
+    const keys = await ctx.db
+      .query("apiKeys")
+      .withIndex("byAccount", (q) => q.eq("accountId", user.accountId))
+      .collect();
+
+    keys.sort((a, b) => b.createdAt - a.createdAt);
+
+    return keys.map((key) => ({
+      apiKeyId: key._id,
+      label: key.label ?? undefined,
+      idPrefix: key.idPrefix,
+      createdAt: key.createdAt,
+      lastUsedAt: key.lastUsedAt ?? undefined,
+      revokedAt: key.revokedAt ?? undefined
+    }));
+  }
+});
+
 async function generateUniqueApiKey(ctx: MutationCtx): Promise<GeneratedApiKey> {
   const maxAttempts = 5;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -206,3 +292,167 @@ export const verifySecret = query({
     };
   }
 });
+
+type AnyCtx = MutationCtx | QueryCtx;
+
+type AuthUserDoc = Awaited<ReturnType<typeof authComponent.getAuthUser>>;
+
+async function requireAuthenticatedUser(ctx: AnyCtx): Promise<{
+  authUser: NonNullable<AuthUserDoc>;
+  betterAuthUserId: string;
+}> {
+  const authUser = await authComponent.getAuthUser(ctx);
+  if (!authUser) {
+    throw new ConvexError({ code: "not_authenticated" });
+  }
+
+  // Better Auth 0.9+ uses _id as the primary identifier
+  const betterAuthUserId = authUser._id;
+
+  return { authUser, betterAuthUserId };
+}
+
+async function getUserByBetterAuthId(ctx: AnyCtx, betterAuthUserId: string) {
+  const user = await ctx.db
+    .query("users")
+    .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
+    .unique();
+
+  if (!user) {
+    throw new ConvexError({ code: "user_not_found", betterAuthUserId });
+  }
+
+  return user;
+}
+
+import type { Doc } from "./_generated/dataModel.js";
+
+async function getOrCreateUserByBetterAuthId(ctx: MutationCtx, betterAuthUserId: string): Promise<Doc<"users">> {
+  const existing = await ctx.db
+    .query("users")
+    .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
+    .unique();
+
+  if (existing) {
+    return existing;
+  }
+
+  const authUserDoc = await authComponent.getAuthUser(ctx);
+  if (!authUserDoc) {
+    throw new ConvexError({ code: "not_authenticated" });
+  }
+
+  const email = typeof authUserDoc.email === "string" ? authUserDoc.email : undefined;
+  const name = typeof authUserDoc.name === "string" ? authUserDoc.name : "Prefix User";
+
+  const account = await createAccountForRecoveredUser(ctx, {
+    betterAuthUserId,
+    email,
+    name,
+  });
+
+  if (!account.user) {
+    throw new ConvexError({ code: "user_creation_failed", betterAuthUserId });
+  }
+
+  return account.user;
+}
+
+async function createAccountForRecoveredUser(
+  ctx: MutationCtx,
+  {
+    betterAuthUserId,
+    email,
+    name,
+  }: {
+    betterAuthUserId: string;
+    email?: string;
+    name: string;
+  },
+) {
+  const now = Date.now();
+
+  const accountId = await ctx.db.insert("accounts", {
+    name,
+    planId: "trial",
+    status: "trial",
+    creditBalance: 0,
+    lowCreditThreshold: DEFAULT_LOW_CREDIT_THRESHOLD,
+    createdAt: now,
+    updatedAt: now,
+    creditRefillAt: now,
+  });
+
+  const userId = await ctx.db.insert("users", {
+    accountId,
+    betterAuthUserId,
+    email: email ?? `${betterAuthUserId}@placeholder.prefix.local`,
+    role: "owner",
+    createdAt: now,
+  });
+
+  await ctx.db.patch(accountId, { ownerUserId: userId });
+
+  // Grant trial credits to recovered users
+  await adjustCreditBalance({
+    ctx,
+    accountId,
+    delta: TRIAL_CREDIT_GRANT,
+    source: "plan_grant",
+    notes: "Trial signup grant (recovered user)",
+    metadata: {
+      reason: "trial_signup_recovered",
+      betterAuthUserId,
+    },
+    now,
+  });
+
+  const user = await ctx.db.get(userId);
+  if (!user) {
+    throw new ConvexError({ code: "user_creation_failed", betterAuthUserId });
+  }
+
+  return {
+    accountId,
+    user,
+  };
+}
+
+async function performIssue(
+  ctx: MutationCtx,
+  accountId: Id<"accounts">,
+  createdByUserId: Id<"users">,
+  label?: string,
+) {
+  const account = await ctx.db.get(accountId);
+  if (!account) {
+    throw new ConvexError({ code: "account_not_found", accountId });
+  }
+
+  const user = await ctx.db.get(createdByUserId);
+  if (!user || user.accountId !== accountId) {
+    throw new ConvexError({
+      code: "user_not_in_account",
+      accountId,
+      userId: createdByUserId
+    });
+  }
+
+  const now = Date.now();
+  const generated = await generateUniqueApiKey(ctx);
+
+  const apiKeyId = await ctx.db.insert("apiKeys", {
+    accountId,
+    idPrefix: generated.prefix,
+    hash: generated.hash,
+    label,
+    createdBy: createdByUserId,
+    createdAt: now
+  });
+
+  return {
+    apiKeyId,
+    secret: generated.secret,
+    prefix: generated.prefix
+  };
+}

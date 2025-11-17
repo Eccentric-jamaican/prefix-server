@@ -15,9 +15,13 @@ export default defineSchema({
       v.literal("canceled")
     ),
     polarCustomerId: v.optional(v.string()),
+    polarProductId: v.optional(v.string()),
+    polarBenefitId: v.optional(v.string()),
     ownerUserId: v.optional(v.id("users")),
     creditBalance: v.number(),
     creditRefillAt: v.optional(timestamp()),
+    creditsPerCycle: v.optional(v.number()),
+    planAssignedAt: v.optional(timestamp()),
     lowCreditThreshold: v.number(),
     espMetadata: v.optional(
       v.object({

@@ -1,9 +1,19 @@
 import { createClient, type GenericCtx } from "@convex-dev/better-auth";
+import type { MiddlewareContext } from "better-call";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { components } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
 import { query } from "./_generated/server";
+import {
+  POLAR_USER_ADDITIONAL_FIELDS,
+  type PaidPlanKey,
+} from "../../shared/constants";
 import { betterAuth } from "better-auth";
+import { api as coreApi } from "../../convex/_generated/api";
+import { ConvexHttpClient } from "convex/browser";
+
+const isPaidPlanKey = (value: unknown): value is PaidPlanKey =>
+  value === "starter" || value === "growth" || value === "scale";
 
 const siteUrl = process.env.SITE_URL;
 const convexSiteUrl = process.env.CONVEX_SITE_URL;
@@ -25,29 +35,151 @@ const trustedOrigins = [siteUrl, convexSiteUrl].filter(
 // as well as helper methods for general use.
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
-export const createAuth = (
-  ctx: GenericCtx<DataModel>,
-  { optionsOnly } = { optionsOnly: false },
-) => {
+const baseAuthOptions = {
+  secret: betterAuthSecret,
+  baseURL: siteUrl,
+  trustedOrigins,
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
+  user: {
+    additionalFields: POLAR_USER_ADDITIONAL_FIELDS,
+  },
+  plugins: [convex()],
+  // Hooks temporarily commented out for debugging
+  /*
+  hooks: {
+    after: async (input) => {
+      const ctx = input as MiddlewareContext<any, any>;
+      console.log("[BetterAuth after hook] invoked", {
+        path: ctx.path,
+        method: ctx.method,
+        hasReturned: Boolean((ctx.context as any)?.returned),
+      });
+
+      if (ctx.path !== "/sign-up/email" || ctx.method !== "POST") {
+        return;
+      }
+
+      const betterAuthCtx = ctx.context as typeof ctx.context & {
+        returned?: unknown;
+        request?: Request;
+      };
+
+      const signUpResult = betterAuthCtx.returned;
+      console.log("[BetterAuth after hook] raw signUpResult", signUpResult);
+      if (!signUpResult || typeof signUpResult !== "object") {
+        return;
+      }
+
+      if ("headers" in signUpResult) {
+        console.log("[BetterAuth after hook] Received Response-like result, skipping mutation");
+        return;
+      }
+
+      const payload = { ...(signUpResult as Record<string, unknown>) };
+      const userData = payload && typeof payload.user === "object" && payload.user !== null
+        ? (payload.user as Record<string, unknown>)
+        : null;
+      const userId = userData && typeof userData.id === "string" ? userData.id : undefined;
+
+      if (!userId) {
+        console.log("[BetterAuth after hook] missing userId", { userData });
+        return;
+      }
+
+      const email = userData && typeof userData.email === "string" ? userData.email : undefined;
+      const name = userData && typeof userData.name === "string" ? userData.name : undefined;
+      const rawPlanKey = userData && typeof (userData as Record<string, unknown>).planKey === "string"
+        ? (userData as Record<string, unknown>).planKey
+        : undefined;
+      const planKey = isPaidPlanKey(rawPlanKey) ? rawPlanKey : undefined;
+
+      if (!email || !name) {
+        console.log("[BetterAuth after hook] missing email or name", { email, name });
+        return;
+      }
+
+      console.log("[BetterAuth after hook] invoking createFromBetterAuth", {
+        userId,
+        email,
+        name,
+        planKey,
+      });
+
+      const deploymentUrl =
+        process.env.CONVEX_URL ??
+        process.env.NEXT_PUBLIC_CONVEX_URL ??
+        process.env.CONVEX_DEPLOYMENT_URL;
+      const convexUrl = deploymentUrl && deploymentUrl.endsWith(".convex.site")
+        ? deploymentUrl.replace(/\.convex\.site$/, ".convex.cloud")
+        : deploymentUrl;
+
+      if (!convexUrl) {
+        console.log("[BetterAuth after hook] missing Convex URL", {
+          deploymentUrl,
+          convexUrl,
+        });
+        return;
+      }
+
+      console.log("[BetterAuth after hook] using Convex deployment URL", { convexUrl });
+      const convexClient = new ConvexHttpClient(convexUrl);
+
+      let result: { accountId: string } | undefined;
+
+      try {
+        result = await convexClient.mutation(
+          coreApi.accounts.createFromBetterAuth,
+          {
+            betterAuthUserId: userId,
+            email,
+            accountName: name,
+            planKey,
+          },
+        );
+      } catch (error) {
+        console.error("[BetterAuth after hook] Convex account provisioning failed", {
+          userId,
+          email,
+          planKey,
+          error,
+        });
+
+        try {
+          console.log("[BetterAuth after hook] Cleaning up BetterAuth user after Convex failure", {
+            userId,
+          });
+          const deleteUser = (authComponent as { users?: { deleteUser: (id: string) => Promise<void> } }).users?.deleteUser;
+          if (deleteUser) {
+            await deleteUser(userId);
+          }
+        } catch (cleanupError) {
+          console.error("[BetterAuth after hook] Failed to clean up BetterAuth user", {
+            userId,
+            cleanupError,
+          });
+        }
+
+        throw new Error("Failed to provision account after signup. Please try again.");
+      }
+
+      if (payload) {
+        console.log("[BetterAuth after hook] received mutation result", result);
+        payload.accountId = result.accountId;
+        betterAuthCtx.returned = payload;
+        console.log("[BetterAuth after hook] patched payload", payload);
+      }
+    },
+  },
+  */
+} satisfies Parameters<typeof betterAuth>[0];
+
+export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
-    // disable logging when createAuth is called just to generate options.
-    // this is not required, but there's a lot of noise in logs without it.
-    logger: {
-      disabled: optionsOnly,
-    },
-    secret: betterAuthSecret,
-    baseURL: siteUrl,
-    trustedOrigins,
+    ...baseAuthOptions,
     database: authComponent.adapter(ctx),
-    // Configure simple, non-verified email/password to get started
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: false,
-    },
-    plugins: [
-      // The Convex plugin is required for Convex compatibility
-      convex(),
-    ],
   });
 };
 

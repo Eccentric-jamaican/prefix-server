@@ -1,0 +1,48 @@
+diff --git a/node_modules/@convex-dev/better-auth/dist/esm/component/schema.d.ts b/node_modules/@convex-dev/better-auth/dist/esm/component/schema.d.ts
+index 2e27806..75fbbc4 100644
+--- a/node_modules/@convex-dev/better-auth/dist/esm/component/schema.d.ts
++++ b/node_modules/@convex-dev/better-auth/dist/esm/component/schema.d.ts
+@@ -27,6 +27,11 @@ export declare const tables: {
+         phoneNumber: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
+         phoneNumberVerified: import("convex/values").VUnion<boolean | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VBoolean<boolean, "required">], "optional", never>;
+         userId: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
++        planKey: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
++        polarPlanId: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
++        polarProductId: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
++        polarBenefitId: import("convex/values").VUnion<string | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VString<string, "required">], "optional", never>;
++        polarCreditsPerCycle: import("convex/values").VUnion<number | null | undefined, [import("convex/values").VNull<null, "required">, import("convex/values").VFloat64<number, "required">], "optional", never>;
+     }, "required", "createdAt" | "userId" | "updatedAt" | "email" | "emailVerified" | "name" | "image" | "twoFactorEnabled" | "isAnonymous" | "username" | "displayUsername" | "phoneNumber" | "phoneNumberVerified">, {
+         email_name: ["email", "name", "_creationTime"];
+         name: ["name", "_creationTime"];
+diff --git a/node_modules/@convex-dev/better-auth/dist/esm/component/schema.js b/node_modules/@convex-dev/better-auth/dist/esm/component/schema.js
+index 7845a4a..489e6e8 100644
+--- a/node_modules/@convex-dev/better-auth/dist/esm/component/schema.js
++++ b/node_modules/@convex-dev/better-auth/dist/esm/component/schema.js
+@@ -18,6 +18,11 @@ export const tables = {
+         phoneNumber: v.optional(v.union(v.null(), v.string())),
+         phoneNumberVerified: v.optional(v.union(v.null(), v.boolean())),
+         userId: v.optional(v.union(v.null(), v.string())),
++        planKey: v.optional(v.union(v.null(), v.string())),
++        polarPlanId: v.optional(v.union(v.null(), v.string())),
++        polarProductId: v.optional(v.union(v.null(), v.string())),
++        polarBenefitId: v.optional(v.union(v.null(), v.string())),
++        polarCreditsPerCycle: v.optional(v.union(v.null(), v.number())),
+     })
+         .index("email_name", ["email", "name"])
+         .index("name", ["name"])
+diff --git a/node_modules/@convex-dev/better-auth/src/component/schema.ts b/node_modules/@convex-dev/better-auth/src/component/schema.ts
+index b7329fc..8668f6f 100644
+--- a/node_modules/@convex-dev/better-auth/src/component/schema.ts
++++ b/node_modules/@convex-dev/better-auth/src/component/schema.ts
+@@ -20,6 +20,11 @@ export const tables = {
+     phoneNumber: v.optional(v.union(v.null(), v.string())),
+     phoneNumberVerified: v.optional(v.union(v.null(), v.boolean())),
+     userId: v.optional(v.union(v.null(), v.string())),
++    planKey: v.optional(v.union(v.null(), v.string())),
++    polarPlanId: v.optional(v.union(v.null(), v.string())),
++    polarProductId: v.optional(v.union(v.null(), v.string())),
++    polarBenefitId: v.optional(v.union(v.null(), v.string())),
++    polarCreditsPerCycle: v.optional(v.union(v.null(), v.number())),
+   })
+     .index("email_name", ["email","name"])
+     .index("name", ["name"])
