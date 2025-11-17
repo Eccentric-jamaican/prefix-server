@@ -3,13 +3,13 @@ import { convexClient } from "@convex-dev/better-auth/client/plugins";
 import type { BetterAuthOptions } from "better-auth";
 import { POLAR_USER_ADDITIONAL_FIELDS } from "../../../shared/constants";
 
-const clientAuthOptions = {
+const clientAuthOptions: Partial<BetterAuthOptions> = {
   user: {
     additionalFields: POLAR_USER_ADDITIONAL_FIELDS,
   },
-} satisfies Partial<BetterAuthOptions>;
+};
 
 export const authClient = createAuthClient({
   plugins: [convexClient()],
-  $InferAuth: clientAuthOptions,
+  ...clientAuthOptions,
 });

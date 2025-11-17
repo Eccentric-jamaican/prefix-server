@@ -7,7 +7,7 @@ import { query } from "./_generated/server";
 import {
   POLAR_USER_ADDITIONAL_FIELDS,
   type PaidPlanKey,
-} from "../../shared/constants.js";
+} from "../../shared/constants";
 import { betterAuth } from "better-auth";
 import { api as coreApi } from "../../convex/_generated/api";
 import { ConvexHttpClient } from "convex/browser";
@@ -125,15 +125,43 @@ const baseAuthOptions = {
       console.log("[BetterAuth after hook] using Convex deployment URL", { convexUrl });
       const convexClient = new ConvexHttpClient(convexUrl);
 
-      const result = await convexClient.mutation(
-        (coreApi as any).accounts.createFromBetterAuth,
-        {
-          betterAuthUserId: userId,
+      let result: { accountId: string } | undefined;
+
+      try {
+        result = await convexClient.mutation(
+          coreApi.accounts.createFromBetterAuth,
+          {
+            betterAuthUserId: userId,
+            email,
+            accountName: name,
+            planKey,
+          },
+        );
+      } catch (error) {
+        console.error("[BetterAuth after hook] Convex account provisioning failed", {
+          userId,
           email,
-          accountName: name,
           planKey,
-        },
-      );
+          error,
+        });
+
+        try {
+          console.log("[BetterAuth after hook] Cleaning up BetterAuth user after Convex failure", {
+            userId,
+          });
+          const deleteUser = (authComponent as { users?: { deleteUser: (id: string) => Promise<void> } }).users?.deleteUser;
+          if (deleteUser) {
+            await deleteUser(userId);
+          }
+        } catch (cleanupError) {
+          console.error("[BetterAuth after hook] Failed to clean up BetterAuth user", {
+            userId,
+            cleanupError,
+          });
+        }
+
+        throw new Error("Failed to provision account after signup. Please try again.");
+      }
 
       if (payload) {
         console.log("[BetterAuth after hook] received mutation result", result);

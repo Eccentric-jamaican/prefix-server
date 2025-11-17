@@ -3,7 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { z } from "zod";
 import { getToken } from "@convex-dev/better-auth/nextjs";
 import { createAuth } from "../../../../convex/auth";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "../../../../../convex/_generated/api.js";
 import type { PaidPlanKey } from "../../../../../shared/constants";
 
 const requestSchema = z.object({
@@ -21,11 +21,10 @@ type HandlerDependencies = {
 function resolveConvexUrl() {
   const url = process.env.CONVEX_DEPLOYMENT_URL ?? process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
-    throw new Error("Missing Convex deployment URL. Set CONVEX_DEPLOYMENT_URL or NEXT_PUBLIC_CONVEX_URL.");
+    throw new Error("Missing Convex deployment URL. Set CONVEX_DEPLOYMENT_URL, CONVEX_URL, or NEXT_PUBLIC_CONVEX_URL.");
   }
   return url;
 }
-
 function resolveAppOrigin(req: Request) {
   return process.env.NEXT_PUBLIC_APP_ORIGIN ?? new URL(req.url).origin;
 }
@@ -90,10 +89,17 @@ export function createPostHandler(overrides: CheckoutSessionHandlerOverrides = {
         cancelUrl: `${origin}/checkout/cancel`,
       });
 
-      return NextResponse.json({ checkoutId: checkoutSession.checkoutId, url: checkoutSession.url });
+      return NextResponse.json(checkoutSession);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return NextResponse.json({ error: "Failed to create checkout session", details: message }, { status: 500 });
+      console.error("Failed to create checkout session", error);
+
+      const isProduction = process.env.NODE_ENV === "production";
+      const details = !isProduction && error instanceof Error ? error.message : "Internal server error";
+
+      return NextResponse.json(
+        { error: "Failed to create checkout session", details },
+        { status: 500 },
+      );
     }
   };
 }

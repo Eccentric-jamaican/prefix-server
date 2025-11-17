@@ -9,13 +9,26 @@ import {
   type PaidPlanKey,
 } from "@/lib/polarPlans";
 
-type SignupPayload = Parameters<typeof authClient.signUp.email>[0] & {
+type AuthSignupPayload = Parameters<typeof authClient.signUp.email>[0];
+
+type PolarSignupData = {
   planKey: PaidPlanKey;
   polarPlanId: string;
   polarProductId: string;
   polarBenefitId: string;
   polarCreditsPerCycle: number;
 };
+
+function buildPolarSignupData(planKey: PaidPlanKey): PolarSignupData {
+  const plan = POLAR_PLAN_DEFINITIONS[planKey];
+  return {
+    planKey,
+    polarPlanId: plan.planId,
+    polarProductId: plan.productId,
+    polarBenefitId: plan.benefitId,
+    polarCreditsPerCycle: plan.creditsPerCycle,
+  };
+}
 
 type CheckoutSessionResponse = {
   checkoutId: string;
@@ -77,6 +90,16 @@ const PLAN_OPTIONS: PlanOption[] = [
     creditsPerCycle: POLAR_PLAN_DEFINITIONS.scale.creditsPerCycle,
   },
 ];
+
+const POLAR_CHECKOUT_HOSTS: Record<"production" | "sandbox", readonly string[]> = {
+  production: ["polar.sh", "checkout.polar.sh"],
+  sandbox: ["sandbox.polar.sh", "checkout.sandbox.polar.sh", "polar.host"],
+};
+
+type PolarCheckoutEnvironment = keyof typeof POLAR_CHECKOUT_HOSTS;
+
+const polarCheckoutEnvironment: PolarCheckoutEnvironment =
+  process.env.NEXT_PUBLIC_POLAR_ENVIRONMENT === "production" ? "production" : "sandbox";
 
 export default function Home() {
   const router = useRouter();
@@ -141,23 +164,15 @@ export default function Home() {
           setIsSubmitting(true);
           setStatus("Signing up and preparing checkout…");
 
-          const signUpPayload = {
+          const signUpCredentials: AuthSignupPayload = {
             email,
             password,
             name: name.trim(),
-            planKey: selectedPlan,
-            polarPlanId: selectedPlanDefinition.planId,
-            polarProductId: selectedPlanDefinition.productId,
-            polarBenefitId: selectedPlanDefinition.benefitId,
-            polarCreditsPerCycle: selectedPlanDefinition.creditsPerCycle,
-          } as SignupPayload;
+          };
 
-          const { data, error } = await authClient.signUp.email(
-            signUpPayload as unknown as Parameters<typeof authClient.signUp.email>[0],
-            {
-              onRequest: () => setStatus("Creating your Prefix account…"),
-            },
-          );
+          const { data, error } = await authClient.signUp.email(signUpCredentials, {
+            onRequest: () => setStatus("Creating your Prefix account…"),
+          });
 
           if (error) {
             setStatus(`Signup failed: ${error.message ?? "Unknown error"}`);
@@ -171,12 +186,22 @@ export default function Home() {
 
           const accountId = data.accountId;
 
+          // Polar billing metadata is stored separately; Better Auth only accepts credentials.
+          const polarSignupData = buildPolarSignupData(selectedPlan);
+
           setStatus("Generating checkout session…");
 
           const response = await fetch("/api/checkout/session", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ accountId, planKey: selectedPlan }),
+            body: JSON.stringify({
+              accountId,
+              planKey: polarSignupData.planKey,
+              polarPlanId: polarSignupData.polarPlanId,
+              polarProductId: polarSignupData.polarProductId,
+              polarBenefitId: polarSignupData.polarBenefitId,
+              polarCreditsPerCycle: polarSignupData.polarCreditsPerCycle,
+            }),
           });
 
           if (!response.ok) {
@@ -197,8 +222,29 @@ export default function Home() {
             return;
           }
 
-          setStatus("Redirecting you to Polar checkout…");
-          router.push(payload.url);
+          try {
+            const checkoutUrl = new URL(payload.url);
+
+            if (checkoutUrl.protocol !== "https:") {
+              throw new Error("Checkout URL must use HTTPS.");
+            }
+
+            const allowedHosts = POLAR_CHECKOUT_HOSTS[polarCheckoutEnvironment];
+            const hostnameAllowed = allowedHosts.some((host) => host === checkoutUrl.hostname);
+            if (!hostnameAllowed) {
+              throw new Error("Checkout URL domain is not trusted.");
+            }
+
+            setStatus("Redirecting you to Polar checkout…");
+            router.push(checkoutUrl.toString());
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Invalid checkout URL received. Please contact support.";
+            setStatus(message);
+            return;
+          }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Unexpected signup error";

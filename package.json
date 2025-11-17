@@ -19,7 +19,8 @@
     "polar:seed": "node scripts/polar/create-products.js",
     "polar:seed:prod": "node scripts/polar/create-products.js --prod",
     "polar:benefits": "node scripts/polar/create-benefits.js",
-    "polar:benefits:prod": "node scripts/polar/create-benefits.js --prod"
+    "polar:benefits:prod": "node scripts/polar/create-benefits.js --prod",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.9.7",
@@ -47,6 +48,7 @@
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
+    "patch-package": "^8.0.1",
     "prettier": "^3.3.3",
     "supertest": "^6.3.4",
     "ts-node-dev": "^2.0.0",

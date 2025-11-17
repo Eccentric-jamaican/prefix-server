@@ -57,21 +57,17 @@ export const revoke = mutation({
     revokedByUserId: v.optional(v.id("users")),
     reason: v.optional(v.string())
   },
-  returns: v.object({
-    apiKeyId: v.id("apiKeys"),
-    revokedAt: v.optional(v.number()),
-    alreadyRevoked: v.boolean()
-  }),
+  returns: apiKeyRevokeReturnValidator,
   handler: async (ctx, args) => {
-    const key = await ctx.db.get(args.apiKeyId);
-    if (!key) {
+    const apiKey = await ctx.db.get(args.apiKeyId);
+    if (!apiKey) {
       throw new ConvexError({ code: "api_key_not_found", apiKeyId: args.apiKeyId });
     }
 
-    if (key.revokedAt) {
+    if (apiKey.revokedAt) {
       return {
-        apiKeyId: key._id,
-        revokedAt: key.revokedAt,
+        apiKeyId: apiKey._id,
+        revokedAt: apiKey.revokedAt,
         alreadyRevoked: true
       };
     }
@@ -404,7 +400,7 @@ async function createAccountForRecoveredUser(
   const userId = await ctx.db.insert("users", {
     accountId,
     betterAuthUserId,
-    email: email ?? `${betterAuthUserId}@unknown`,
+    email: email ?? `${betterAuthUserId}@placeholder.prefix.local`,
     role: "owner",
     createdAt: now,
   });

@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { MockInstance } from "vitest";
 
 import {
   handleCreateFromBetterAuth,
   handleAssignPlan
 } from "../convex/accounts.js";
+import type { Id } from "../convex/_generated/dataModel.js";
 import {
   POLAR_PLAN_DEFINITIONS,
   TRIAL_CREDIT_GRANT,
@@ -98,7 +100,8 @@ class MockDb {
   }
 
   peek(table: string, id: string) {
-    return this.tables.get(table)?.get(id) ?? null;
+    const record = this.tables.get(table)?.get(id);
+    return record ? { ...record } : null;
   }
 
   private ensureTable(table: string) {
@@ -120,7 +123,7 @@ class MockDb {
 const FIXED_NOW = new Date("2024-01-01T00:00:00.000Z").getTime();
 
 describe("convex/accounts createFromBetterAuth", () => {
-  let dateNowSpy: ReturnType<typeof vi.spyOn>;
+  let dateNowSpy: MockInstance<[], number>;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -221,7 +224,7 @@ describe("convex/accounts createFromBetterAuth", () => {
 });
 
 describe("convex/accounts assignPlan", () => {
-  let dateNowSpy: ReturnType<typeof vi.spyOn>;
+  let dateNowSpy: MockInstance<[], number>;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -233,7 +236,7 @@ describe("convex/accounts assignPlan", () => {
   });
 
   it("updates account metadata and grants credits for the selected plan", async () => {
-    const accountId = "accounts_1";
+    const accountId = "accounts_1" as Id<"accounts">;
     const db = new MockDb({
       accounts: [
         {
@@ -251,28 +254,31 @@ describe("convex/accounts assignPlan", () => {
     const ctx = { db } as unknown as MutationContext;
     const plan = POLAR_PLAN_DEFINITIONS.scale;
 
+    const ledgerEntryId = "creditLedger_42" as Id<"creditLedger">;
     const ledgerSpy = vi
       .spyOn(ledgerModule, "adjustCreditBalance")
       .mockResolvedValue({
         balance: plan.creditsPerCycle,
         previousBalance: 0,
         timestamp: FIXED_NOW,
-        ledgerEntryId: "creditLedger_42" as never
+        ledgerEntryId
       });
 
+    const polarCustomerId = "polarCustomer_123";
+
     const result = await handleAssignPlan(ctx, {
-      accountId: accountId as never,
+      accountId,
       planKey: "scale",
-      polarCustomerId: "cust_123",
+      polarCustomerId,
       nowMs: FIXED_NOW
     });
 
     expect(result).toMatchObject({
-      accountId: accountId as never,
+      accountId,
       planId: plan.planId,
       status: "active",
       creditBalance: plan.creditsPerCycle,
-      ledgerEntryId: "creditLedger_42"
+      ledgerEntryId
     });
 
     expect(ledgerSpy).toHaveBeenCalledWith(
@@ -289,7 +295,7 @@ describe("convex/accounts assignPlan", () => {
       polarProductId: plan.productId,
       polarBenefitId: plan.benefitId,
       creditsPerCycle: plan.creditsPerCycle,
-      polarCustomerId: "cust_123",
+      polarCustomerId,
       planAssignedAt: FIXED_NOW,
       creditRefillAt: FIXED_NOW,
       updatedAt: FIXED_NOW
