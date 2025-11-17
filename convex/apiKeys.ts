@@ -205,16 +205,8 @@ export const listForCurrentUser = query({
       return [];
     }
 
-    const betterAuthUserId =
-      typeof authUser.userId === "string" && authUser.userId.length > 0
-        ? authUser.userId
-        : authUser._id;
-
-    if (typeof authUser.userId !== "string" || authUser.userId.length === 0) {
-      console.warn("BetterAuth user missing userId; using internal id", {
-        authUserId: authUser._id,
-      });
-    }
+    // Better Auth 0.9+ uses _id as the primary identifier
+    const betterAuthUserId = authUser._id;
     const user = await ctx.db
       .query("users")
       .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
@@ -312,16 +304,8 @@ async function requireAuthenticatedUser(ctx: AnyCtx): Promise<{
     throw new ConvexError({ code: "not_authenticated" });
   }
 
-  const betterAuthUserId =
-    typeof authUser.userId === "string" && authUser.userId.length > 0
-      ? authUser.userId
-      : authUser._id;
-
-  if (typeof authUser.userId !== "string" || authUser.userId.length === 0) {
-    console.warn("BetterAuth user missing userId field; falling back to _id", {
-      authUserId: authUser._id,
-    });
-  }
+  // Better Auth 0.9+ uses _id as the primary identifier
+  const betterAuthUserId = authUser._id;
 
   return { authUser, betterAuthUserId };
 }

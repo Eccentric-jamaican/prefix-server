@@ -1,5 +1,5 @@
 import { createClient, type GenericCtx } from "@convex-dev/better-auth";
-import type { MiddlewareContext } from "better-call";
+import { createAuthMiddleware } from "better-auth/api";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { components } from "./_generated/api.js";
 import { DataModel } from "./_generated/dataModel.js";
@@ -48,29 +48,25 @@ const baseAuthOptions = {
   },
   plugins: [convex()],
   hooks: {
-    after: async (input) => {
-      const ctx = input as MiddlewareContext<any, any>;
+    after: createAuthMiddleware(async (ctx) => {
       console.log("[BetterAuth after hook] invoked", {
         path: ctx.path,
         method: ctx.method,
-        hasReturned: Boolean((ctx.context as any)?.returned),
       });
 
-      if (ctx.path !== "/sign-up/email" || ctx.method !== "POST") {
+      // Only process signup requests
+      if (!ctx.path.startsWith("/sign-up/email") || ctx.method !== "POST") {
         return;
       }
 
-      const betterAuthCtx = ctx.context as typeof ctx.context & {
-        returned?: unknown;
-        request?: Request;
-      };
-
-      const signUpResult = betterAuthCtx.returned;
+      const signUpResult = ctx.context.returned;
       console.log("[BetterAuth after hook] raw signUpResult", signUpResult);
+      
       if (!signUpResult || typeof signUpResult !== "object") {
         return;
       }
 
+      // Check if it's an error response
       if ("headers" in signUpResult) {
         console.log("[BetterAuth after hook] Received Response-like result, skipping mutation");
         return;
@@ -125,39 +121,43 @@ const baseAuthOptions = {
       console.log("[BetterAuth after hook] using Convex deployment URL", { convexUrl });
       const convexClient = new ConvexHttpClient(convexUrl);
 
-      const result = await convexClient.mutation(
-        (api as any).accounts.createFromBetterAuth,
-        {
-          betterAuthUserId: userId,
-          email,
-          accountName: name,
-          planKey,
-        },
-      );
+      try {
+        const result = await convexClient.mutation(
+          (api as any).accounts.createFromBetterAuth,
+          {
+            betterAuthUserId: userId,
+            email,
+            accountName: name,
+            planKey,
+          },
+        );
 
-      if (payload) {
         console.log("[BetterAuth after hook] received mutation result", result);
         payload.accountId = result.accountId;
-        betterAuthCtx.returned = payload;
+        ctx.context.returned = payload;
         console.log("[BetterAuth after hook] patched payload", payload);
+      } catch (error) {
+        console.error("[BetterAuth after hook] Convex account provisioning failed", {
+          userId,
+          email,
+          planKey,
+          error,
+        });
+        // Don't throw - let the signup succeed even if account creation fails
+        // The user can be recovered later via the Better Auth user record
       }
-    },
+    }),
   },
 } satisfies Parameters<typeof betterAuth>[0];
 
 export const createAuth = (
   ctx: GenericCtx<DataModel>,
-  { optionsOnly } = { optionsOnly: false },
+  opts?: { optionsOnly?: boolean },
 ) => {
-  const options = {
+  return betterAuth({
     ...baseAuthOptions,
-    logger: {
-      disabled: optionsOnly,
-    },
     database: authComponent.adapter(ctx),
-  };
-
-  return betterAuth(options);
+  });
 };
 
 // Example function for getting the current user

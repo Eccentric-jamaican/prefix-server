@@ -47,6 +47,8 @@ const baseAuthOptions = {
     additionalFields: POLAR_USER_ADDITIONAL_FIELDS,
   },
   plugins: [convex()],
+  // Hooks temporarily commented out for debugging
+  /*
   hooks: {
     after: async (input) => {
       const ctx = input as MiddlewareContext<any, any>;
@@ -171,21 +173,14 @@ const baseAuthOptions = {
       }
     },
   },
+  */
 } satisfies Parameters<typeof betterAuth>[0];
 
-export const createAuth = (
-  ctx: GenericCtx<DataModel>,
-  { optionsOnly } = { optionsOnly: false },
-) => {
-  const options = {
+export const createAuth = (ctx: GenericCtx<DataModel>) => {
+  return betterAuth({
     ...baseAuthOptions,
-    logger: {
-      disabled: optionsOnly,
-    },
     database: authComponent.adapter(ctx),
-  };
-
-  return betterAuth(options);
+  });
 };
 
 // Example function for getting the current user
