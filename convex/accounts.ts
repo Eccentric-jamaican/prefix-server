@@ -53,6 +53,10 @@ export const getAccountForCurrentUser = query({
       accountId: v.id("accounts"),
       userId: v.id("users"),
       role: v.union(v.literal("owner"), v.literal("member")),
+      accountName: v.string(),
+      planId: v.string(),
+      status: v.string(),
+      creditBalance: v.number(),
     }),
     v.null(),
   ),
@@ -78,11 +82,20 @@ export const getAccountForCurrentUser = query({
       return null;
     }
 
+    const account = await ctx.db.get(user.accountId);
+    if (!account) {
+      return null;
+    }
+
     return {
       accountId: user.accountId,
       userId: user._id,
       role: user.role,
-    } as const;
+      accountName: account.name,
+      planId: account.planId,
+      status: account.status,
+      creditBalance: account.creditBalance,
+    };
   },
 });
 

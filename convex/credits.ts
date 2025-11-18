@@ -1,9 +1,10 @@
 import { ConvexError, v } from "convex/values";
 
-import { mutation } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
-import type { MutationCtx } from "./_generated/server.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { adjustCreditBalance, type CreditSource } from "./lib/ledger.js";
+import { authComponent } from "./auth.js";
 
 const creditSourceValidator = v.union(
   v.literal("plan_grant"),
@@ -78,4 +79,54 @@ export const applyDelta = mutation({
       wasApplied: true
     };
   }
+});
+
+export const getHistoryForCurrentUser = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("creditLedger"),
+      _creationTime: v.number(),
+      accountId: v.id("accounts"),
+      delta: v.number(),
+      source: creditSourceValidator,
+      notes: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+  ),
+  handler: async (ctx: QueryCtx, args) => {
+    const authUser = await authComponent.getAuthUser(ctx);
+    if (!authUser) {
+      return [];
+    }
+
+    const betterAuthUserId = authUser._id;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("byBetterAuthUserId", (q) => q.eq("betterAuthUserId", betterAuthUserId))
+      .unique();
+
+    if (!user) {
+      return [];
+    }
+
+    const limit = args.limit ?? 30;
+    const entries = await ctx.db
+      .query("creditLedger")
+      .withIndex("byAccount", (q) => q.eq("accountId", user.accountId))
+      .order("desc")
+      .take(limit);
+
+    return entries.map((entry) => ({
+      _id: entry._id,
+      _creationTime: entry._creationTime,
+      accountId: entry.accountId,
+      delta: entry.delta,
+      source: entry.source,
+      notes: entry.notes,
+      createdAt: entry.createdAt,
+    }));
+  },
 });
