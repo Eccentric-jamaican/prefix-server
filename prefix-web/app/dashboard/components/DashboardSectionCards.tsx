@@ -30,7 +30,7 @@ export function DashboardSectionCards({ account, apiKeysCount }: DashboardSectio
   const isTrialActive = account.status === "trial";
 
   return (
-    <div className="*:data-[slot=card]:from-primary/10 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-muted/60 *:data-[slot=card]:to-background">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Current Plan</CardDescription>

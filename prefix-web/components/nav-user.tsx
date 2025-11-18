@@ -1,3 +1,6 @@
+"use client"
+
+import * as React from "react"
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -6,6 +9,7 @@ import {
   IconUserCircle,
 } from "@tabler/icons-react"
 
+import { authClient } from "@/lib/auth-client"
 import {
   Avatar,
   AvatarFallback,
@@ -27,35 +31,66 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-export function NavUser({
-  user,
-}: {
+type NavUserProps = {
   user: {
     name: string
     email: string
-    avatar: string
+    avatar?: string | null
   }
-}) {
+  isLoading?: boolean
+}
+
+function getInitials(name?: string, fallback?: string) {
+  const source = name?.trim() || fallback?.trim() || "User"
+  const parts = source.split(" ").filter(Boolean)
+  if (parts.length === 0) return "U"
+  const initials = parts.slice(0, 2).map((part) => part[0]!.toUpperCase())
+  return initials.join("")
+}
+
+export function NavUser({ user, isLoading = false }: NavUserProps) {
   const { isMobile } = useSidebar()
+
+  const initials = React.useMemo(
+    () => getInitials(user.name, user.email),
+    [user.name, user.email],
+  )
+
+  const handleSignOut = React.useCallback(async () => {
+    try {
+      await authClient.signOut()
+    } catch (error) {
+      console.error("Failed to sign out", error)
+    }
+  }, [])
+
+  const displayName = isLoading ? "Loading…" : user.name
+  const displayEmail = isLoading ? "" : user.email
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild disabled={isLoading}>
             <SidebarMenuButton
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                {user.avatar ? (
+                  <AvatarImage src={user.avatar} alt={displayName} />
+                ) : null}
+                <AvatarFallback className="rounded-lg">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {user.email}
-                </span>
+                <span className="truncate font-medium">{displayName}</span>
+                {displayEmail ? (
+                  <span className="text-muted-foreground truncate text-xs">
+                    {displayEmail}
+                  </span>
+                ) : null}
               </div>
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -69,14 +104,20 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  {user.avatar ? (
+                    <AvatarImage src={user.avatar} alt={displayName} />
+                  ) : null}
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="text-muted-foreground truncate text-xs">
-                    {user.email}
-                  </span>
+                  <span className="truncate font-medium">{displayName}</span>
+                  {displayEmail ? (
+                    <span className="text-muted-foreground truncate text-xs">
+                      {displayEmail}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -96,7 +137,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut} disabled={isLoading}>
               <IconLogout />
               Log out
             </DropdownMenuItem>
